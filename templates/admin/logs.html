@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Logs - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6 py-4">
+
+    <!-- Header & Action -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('admin_dashboard') }}" class="text-xs font-semibold text-slate-500 hover:text-indigo-600">
+                    &larr; Admin Dashboard
+                </a>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+                Attendance Audit Logs
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">Filter, search, and export device-token verified campus Wi-Fi attendance records.</p>
+        </div>
+
+        <div>
+            <a href="{{ url_for('export_csv', date=date_filter, roll_number=roll_filter, status=status_filter) }}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold shadow-md shadow-emerald-200 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Export Filtered to CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Control Card -->
+    <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <form action="{{ url_for('admin_logs') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            
+            <!-- Date Filter -->
+            <div>
+                <label for="date" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Date Filter
+                </label>
+                <input type="date" id="date" name="date" value="{{ date_filter }}"
+                       class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            </div>
+
+            <!-- Roll Number Filter -->
+            <div>
+                <label for="roll_number" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Student Roll Number
+                </label>
+                <input type="text" id="roll_number" name="roll_number" value="{{ roll_filter }}"
+                       placeholder="e.g. CS-2026-001"
+                       class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            </div>
+
+            <!-- Status Filter -->
+            <div>
+                <label for="status" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Attendance Status
+                </label>
+                <select id="status" name="status" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="">All Statuses</option>
+                    <option value="Present" {% if status_filter == 'Present' %}selected{% endif %}>Present (On-Time)</option>
+                    <option value="Late" {% if status_filter == 'Late' %}selected{% endif %}>Late (Grace Window)</option>
+                </select>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="flex items-center gap-2">
+                <button type="submit" class="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors shadow-sm">
+                    Filter Logs
+                </button>
+                <a href="{{ url_for('admin_logs') }}" class="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors text-center">
+                    Reset
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- Logs Table Card -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-900">
+                Attendance Records <span class="text-xs font-medium text-slate-500 ml-1">({{ logs|length }} entries found)</span>
+            </h3>
+        </div>
+
+        {% if logs %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                    <tr>
+                        <th class="py-3.5 px-6">Date</th>
+                        <th class="py-3.5 px-6">Time</th>
+                        <th class="py-3.5 px-6">Roll Number</th>
+                        <th class="py-3.5 px-6">Student Name</th>
+                        <th class="py-3.5 px-6">Client IP</th>
+                        <th class="py-3.5 px-6">Status</th>
+                        <th class="py-3.5 px-6">Method</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                    {% for log in logs %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-4 px-6 text-slate-900 font-semibold text-xs whitespace-nowrap">
+                            {{ log.date }}
+                        </td>
+                        <td class="py-4 px-6 font-mono text-xs text-slate-600 whitespace-nowrap">
+                            {{ log.timestamp }}
+                        </td>
+                        <td class="py-4 px-6 font-mono text-xs font-bold text-indigo-700 whitespace-nowrap">
+                            <a href="{{ url_for('student_profile', roll_number=log.roll_number) }}" class="hover:underline">
+                                {{ log.roll_number }}
+                            </a>
+                        </td>
+                        <td class="py-4 px-6 text-slate-900 font-semibold text-xs">
+                            {{ log.full_name or log.name }}
+                            <div class="text-[11px] text-slate-400 font-normal">{{ log.email }}</div>
+                        </td>
+                        <td class="py-4 px-6 font-mono text-xs text-slate-600 whitespace-nowrap">
+                            {{ log.client_ip or '—' }}
+                        </td>
+                        <td class="py-4 px-6 whitespace-nowrap">
+                            {% if log.status == 'Present' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Present
+                            </span>
+                            {% elif log.status == 'Late' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                Late
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {{ log.status }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4 px-6 text-xs text-slate-500 whitespace-nowrap">
+                            {{ log.detection_method or 'Device Token Wi-Fi' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="py-16 text-center">
+            <svg class="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <p class="text-sm font-semibold text-slate-700">No matching attendance records found</p>
+            <p class="text-xs text-slate-500 mt-1">Try clearing date, roll number, or status filters.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

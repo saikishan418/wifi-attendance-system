@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Timetable & Period Scheduling - Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-8 py-4">
+
+    <!-- Header & Action -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('admin_dashboard') }}" class="text-xs font-semibold text-slate-500 hover:text-indigo-600">
+                    &larr; Admin Dashboard
+                </a>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+                Timetable & Lecture Periods
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">Map Wi-Fi detection windows to scheduled classes, professors, and classrooms.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button onclick="document.getElementById('modal-add-course').classList.remove('hidden')" class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold border border-slate-200 shadow-sm transition-all">
+                + New Course
+            </button>
+            <button onclick="document.getElementById('modal-add-slot').classList.remove('hidden')" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-md shadow-indigo-200 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Schedule Class Period
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Lecture Period Right Now Banner -->
+    <div class="rounded-3xl p-6 sm:p-8 {% if active_period %}bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white shadow-xl border border-indigo-800{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex items-start gap-4">
+                <div class="w-14 h-14 rounded-2xl {% if active_period %}bg-indigo-500/20 text-indigo-300 border border-indigo-400/30{% else %}bg-slate-200 text-slate-500{% endif %} flex items-center justify-center flex-shrink-0">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-xs font-bold uppercase tracking-wider {% if active_period %}text-sky-300 bg-sky-500/20 border border-sky-400/30{% else %}text-slate-500 bg-slate-200{% endif %} px-2.5 py-0.5 rounded-full">
+                            {% if active_period %}● Active Period in Session{% else %}No Scheduled Lecture Right Now{% endif %}
+                        </span>
+                        {% if active_period %}
+                        <span class="text-xs text-indigo-200">Room: <strong>{{ active_period.room_number }}</strong></span>
+                        {% endif %}
+                    </div>
+                    {% if active_period %}
+                    <h2 class="text-2xl font-black mt-2 text-white">
+                        {{ active_period.course_code }} &mdash; {{ active_period.course_name }}
+                    </h2>
+                    <p class="text-xs text-indigo-200 mt-1">
+                        Instructor: <strong class="text-white">{{ active_period.instructor }}</strong> &bull; Slot: <strong class="text-white">{{ active_period.start_time }} &ndash; {{ active_period.end_time }}</strong> ({{ active_period.day_of_week }})
+                    </p>
+                    <p class="text-xs text-emerald-400 mt-2 font-medium flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        All student devices detected on campus Wi-Fi right now are automatically credited for this lecture period.
+                    </p>
+                    {% else %}
+                    <h2 class="text-xl font-bold mt-2 text-slate-800">
+                        General Campus Attendance Window
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Device detections outside active scheduled periods are logged as General Campus Session.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex-shrink-0">
+                <button onclick="triggerScanNow(this)" class="px-5 py-3 rounded-xl bg-white text-indigo-900 font-bold text-xs hover:bg-indigo-50 shadow-md transition-all">
+                    Scan Active Period Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduled Timetable Slots Table -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Weekly Lecture Schedule</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Recurring periods for automated Wi-Fi attendance capture.</p>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                {{ slots|length }} Scheduled Slots
+            </span>
+        </div>
+
+        {% if slots %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                    <tr>
+                        <th class="py-3.5 px-6">Day</th>
+                        <th class="py-3.5 px-6">Time Window</th>
+                        <th class="py-3.5 px-6">Course</th>
+                        <th class="py-3.5 px-6">Room / Location</th>
+                        <th class="py-3.5 px-6">Instructor</th>
+                        <th class="py-3.5 px-6 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                    {% for slot in slots %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-4 px-6 text-slate-900 font-bold text-xs whitespace-nowrap">
+                            <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                {{ slot.day_of_week }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-6 font-mono text-xs text-slate-700 whitespace-nowrap font-bold">
+                            {{ slot.start_time }} &ndash; {{ slot.end_time }}
+                        </td>
+                        <td class="py-4 px-6 text-xs text-slate-900 font-semibold whitespace-nowrap">
+                            <span class="font-mono text-indigo-600 font-bold mr-1.5">{{ slot.course_code }}</span>
+                            {{ slot.course_name }}
+                        </td>
+                        <td class="py-4 px-6 text-xs text-slate-600 font-medium whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
+                                {{ slot.room_number }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-6 text-xs text-slate-600 whitespace-nowrap">
+                            {{ slot.instructor }}
+                        </td>
+                        <td class="py-4 px-6 text-right whitespace-nowrap">
+                            <form action="{{ url_for('delete_timetable_slot', slot_id=slot.id) }}" method="POST" onsubmit="return confirm('Remove this timetable slot?');" class="inline">
+                                <button type="submit" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100" title="Delete Slot">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="py-16 text-center">
+            <p class="text-sm font-semibold text-slate-700">No Timetable Periods Scheduled Yet</p>
+            <p class="text-xs text-slate-500 mt-1">Click "Schedule Class Period" above to map lecture hours.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Course Catalog Card -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Academic Courses Directory</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Departments and subjects eligible for Wi-Fi attendance tracking.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for c in courses %}
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                            {{ c.course_code }}
+                        </span>
+                        <span class="text-[11px] text-slate-400 font-semibold">{{ c.slots_count }} slot(s)</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-slate-900">{{ c.course_name }}</h4>
+                    <p class="text-xs text-slate-500 mt-1">Instructor: <strong>{{ c.instructor }}</strong></p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-500">
+                    <span>Enrolled: <strong class="text-slate-800">{{ c.enrolled_count }}</strong></span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal: Schedule Timetable Slot -->
+<div id="modal-add-slot" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h3 class="text-base font-bold text-slate-900">Schedule Lecture Period</h3>
+            <button onclick="document.getElementById('modal-add-slot').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+        </div>
+
+        <form action="{{ url_for('add_timetable_slot') }}" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Course</label>
+                <select name="course_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    {% for c in courses %}
+                    <option value="{{ c.id }}">{{ c.course_code }} - {{ c.course_name }} ({{ c.instructor }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Day of Week</label>
+                <select name="day_of_week" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Daily">Daily (Mon-Sun)</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Start Time</label>
+                    <input type="time" name="start_time" required value="09:00" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">End Time</label>
+                    <input type="time" name="end_time" required value="10:30" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Classroom / Room Number</label>
+                <input type="text" name="room_number" required placeholder="e.g. Computing Lab 3 or Hall 101" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-3">
+                <button type="button" onclick="document.getElementById('modal-add-slot').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm">Save Slot</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Create Course -->
+<div id="modal-add-course" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h3 class="text-base font-bold text-slate-900">Create Academic Course</h3>
+            <button onclick="document.getElementById('modal-add-course').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+        </div>
+
+        <form action="{{ url_for('add_course') }}" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Course Code</label>
+                <input type="text" name="course_code" required placeholder="e.g. AI401" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Course Name</label>
+                <input type="text" name="course_name" required placeholder="e.g. Artificial Intelligence" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Instructor / Professor</label>
+                <input type="text" name="instructor" required placeholder="e.g. Dr. Geoffrey Hinton" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-3">
+                <button type="button" onclick="document.getElementById('modal-add-course').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-sm">Save Course</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

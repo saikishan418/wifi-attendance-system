@@ -1,0 +1,659 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - Touchless Attendance{% endblock %}
+
+{% block head %}
+<!-- Client-side gate: check for device_token before rendering portal -->
+<script>
+    (function() {
+        var token = localStorage.getItem("device_token");
+        if (!token || token.trim() === "") {
+            window.location.replace("{{ url_for('register') }}");
+        }
+    })();
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 py-2">
+
+    {% if current_admin %}
+    <!-- Admin Preview Banner: Appears only when an administrator previews the student portal -->
+    <div class="p-4 rounded-xl bg-google-blue-light border border-blue-200 text-xs text-google-blue-text flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-full bg-google-blue text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                A
+            </div>
+            <div>
+                <p class="font-semibold text-google-dark">Administrator Student Portal Preview</p>
+                <p class="text-[11px] text-google-gray">You are logged in as admin. To test another student, use the clear token button.</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="localStorage.removeItem('device_token'); window.location.href='{{ url_for('register') }}';" 
+                    class="px-3 py-1.5 rounded-full text-xs font-medium text-google-red-text bg-white border border-red-200 hover:bg-google-red-light transition-colors">
+                Clear Stored Token
+            </button>
+            <a href="{{ url_for('admin_dashboard') }}" 
+               class="px-4 py-1.5 rounded-full text-xs font-medium text-white bg-google-blue hover:bg-google-blue-hover transition-colors shadow-xs">
+                &larr; Return to Admin Console
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Loading Placeholder Skeleton (Hidden once API responds) -->
+    <div id="portal-loading" class="bg-white rounded-2xl p-10 border border-google-border shadow-xs text-center py-16">
+        <svg class="animate-spin h-9 w-9 text-google-blue mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <h3 class="text-base font-bold text-google-dark" style="font-family: 'Google Sans', sans-serif;">Verifying Device Token &amp; Campus Network...</h3>
+        <p class="text-xs text-google-gray mt-1">Authenticating browser identity against campus Wi-Fi telemetry.</p>
+    </div>
+
+    <!-- Active Student Portal Container -->
+    <div id="portal-content" class="hidden space-y-6">
+
+        <!-- Student Hero Banner: Google Classroom Style -->
+        <div class="rounded-2xl bg-gradient-to-r from-[#1a73e8] via-[#1b6cd9] to-[#1752b0] text-white p-6 sm:p-8 shadow-sm">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <!-- Status Badges -->
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                        <span id="badge-network-status" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/20 backdrop-blur-md text-white border border-white/20">
+                            <span class="w-2 h-2 rounded-full bg-white"></span>
+                            Detecting Network...
+                        </span>
+                        <span id="badge-device-token" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/20 backdrop-blur-md text-white border border-white/20">
+                            <span class="w-2 h-2 rounded-full bg-blue-200"></span>
+                            Device Paired
+                        </span>
+                        <span class="text-xs font-normal text-blue-100">
+                            Session Date: <strong class="text-white font-medium">{{ today_date }}</strong>
+                        </span>
+                    </div>
+
+                    <!-- Student Greeting -->
+                    <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight" style="font-family: 'Google Sans', sans-serif;">
+                        Welcome, <span id="student-name-display" class="text-white underline decoration-blue-300 decoration-2 underline-offset-4">Student</span>
+                    </h1>
+                    <p class="text-xs sm:text-sm text-blue-100 mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span>Roll Number: <strong id="student-roll-display" class="font-mono text-white">...</strong></span>
+                        <span>Campus Email: <strong id="student-email-display" class="text-white">...</strong></span>
+                    </p>
+                </div>
+
+                <!-- Profile Link -->
+                <div class="flex items-center gap-3">
+                    <a id="link-full-profile" href="#" class="px-4 py-2 rounded-full bg-white text-google-blue hover:bg-blue-50 text-xs font-medium shadow-xs transition-all">
+                        Full Attendance Record &rarr;
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Check-In Action Command Card -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            
+            <!-- Left: Check-In Controls (8 Cols) -->
+            <div class="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col justify-between">
+                
+                <!-- Card Header -->
+                <div>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Daily Presence Verification</span>
+                            <h2 class="text-xl font-bold text-slate-900 mt-0.5">Campus Wi-Fi Check-In</h2>
+                        </div>
+                        <div id="window-status-pill" class="px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 self-start sm:self-auto bg-slate-100 text-slate-700">
+                            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                            Evaluating Window...
+                        </div>
+                    </div>
+
+                    <!-- Network & Time Window Info Banner -->
+                    <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <!-- Wi-Fi Subnet Check -->
+                        <div id="network-info-card" class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+                            <div id="network-icon-box" class="w-8 h-8 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                            </div>
+                            <div>
+                                <p class="font-bold text-slate-800">Campus Wi-Fi Subnet</p>
+                                <p id="network-desc-text" class="text-slate-500 mt-0.5">Checking client IP...</p>
+                            </div>
+                        </div>
+
+                        <!-- Daily Time Window -->
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                            <div>
+                                <p class="font-bold text-slate-800">Daily Attendance Window</p>
+                                <p class="text-slate-500 mt-0.5">
+                                    Open: <strong class="text-slate-700 font-mono">{{ time_settings.checkin_start_time }}</strong> &bull; Cutoff: <strong class="text-slate-700 font-mono">{{ time_settings.checkin_cutoff_time }}</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Feedback Message / Alert -->
+                    <div id="checkin-alert-box" class="hidden mt-4 p-4 rounded-2xl text-xs font-medium"></div>
+                </div>
+
+                <!-- Action Button Area -->
+                <div class="mt-8 pt-6 border-t border-slate-100">
+                    
+                    <!-- State A: Already Checked In Today -->
+                    <div id="already-checked-in-view" class="hidden p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
+                        <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                        <h3 class="text-base font-bold text-emerald-950">Attendance Recorded for Today!</h3>
+                        <p class="text-xs text-emerald-800 mt-1">
+                            Status: <strong id="today-record-status" class="uppercase font-bold">PRESENT</strong> &bull; 
+                            Logged at: <strong id="today-record-time" class="font-mono">--:--:--</strong> &bull;
+                            IP: <span id="today-record-ip" class="font-mono">...</span>
+                        </p>
+                        <p class="text-[11px] text-emerald-700 mt-2 font-normal">
+                            Your device was verified on the campus Wi-Fi network. No further action needed today.
+                        </p>
+                    </div>
+
+                    <!-- State B: Check-In Button Area (When not yet marked today) -->
+                    <div id="checkin-btn-view" class="space-y-3">
+                        <button type="button" id="btn-mark-attendance" onclick="performAttendanceCheckIn()" class="w-full py-3.5 px-6 rounded-full bg-google-blue hover:bg-google-blue-hover text-white font-medium text-base shadow-xs transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span id="btn-mark-text">Mark Attendance Now</span>
+                        </button>
+                        <p id="btn-subtext" class="text-center text-xs text-google-gray">
+                            Validates your browser device token, campus Wi-Fi subnet, and current server time.
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Right: Live Deadline Countdown Widget (4 Cols) -->
+            <div class="lg:col-span-4 bg-gradient-to-br from-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white flex flex-col justify-between shadow-lg">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-300">Time Window Engine</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-white mt-3" id="countdown-heading">
+                        Deadline Countdown
+                    </h3>
+                    <p class="text-xs text-slate-300 mt-1" id="countdown-subtext">
+                        Time remaining until daily attendance cutoff.
+                    </p>
+
+                    <!-- Interactive Digital Clock Display -->
+                    <div class="mt-6 grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+                            <div id="countdown-hours" class="text-2xl sm:text-3xl font-mono font-extrabold text-white">00</div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Hours</span>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+                            <div id="countdown-minutes" class="text-2xl sm:text-3xl font-mono font-extrabold text-sky-400">00</div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Minutes</span>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+                            <div id="countdown-seconds" class="text-2xl sm:text-3xl font-mono font-extrabold text-indigo-300">00</div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Seconds</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Time Rules Info Box -->
+                <div class="mt-6 pt-6 border-t border-white/10 space-y-2 text-xs text-slate-300">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">On-Time Deadline:</span>
+                        <strong class="font-mono text-emerald-400" id="time-cutoff-label">{{ time_settings.checkin_cutoff_time }}</strong>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Late Grace Window:</span>
+                        <strong class="font-mono text-amber-300" id="time-late-cutoff-label">Until {{ time_settings.checkin_late_cutoff_time }}</strong>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Server Clock:</span>
+                        <strong class="font-mono text-white" id="live-server-clock">--:--:--</strong>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Student Attendance Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            
+            <!-- Card 1: Total Present -->
+            <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Days Present</p>
+                    <p id="stat-present-days" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-1">0</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">On-Time Check-Ins</p>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+            </div>
+
+            <!-- Card 2: Total Late -->
+            <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Days Late</p>
+                    <p id="stat-late-days" class="text-2xl sm:text-3xl font-extrabold text-amber-500 mt-1">0</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">After Cutoff Window</p>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+
+            <!-- Card 3: Attendance Rate -->
+            <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Overall Rate</p>
+                    <p id="stat-attendance-rate" class="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-1">0.0%</p>
+                    <div class="mt-1.5 w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div id="stat-rate-bar" class="h-1.5 rounded-full bg-indigo-600" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+            </div>
+
+            <!-- Card 4: Exam Eligibility Criteria -->
+            <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Exam Eligibility</p>
+                    <div id="stat-eligibility-badge" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                        Checking...
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">Threshold: 75% required</p>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Personal Attendance History Table -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Personal Attendance Record</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Audit log of your verified campus Wi-Fi check-ins.</p>
+                </div>
+                <span id="history-count-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                    0 entries
+                </span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                        <tr>
+                            <th class="py-3.5 px-6">Date</th>
+                            <th class="py-3.5 px-6">Timestamp</th>
+                            <th class="py-3.5 px-6">Status</th>
+                            <th class="py-3.5 px-6">Client IP</th>
+                            <th class="py-3.5 px-6">Verification Method</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body" class="divide-y divide-slate-100 font-medium text-slate-700">
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-xs text-slate-400">
+                                Loading attendance history...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let studentData = null;
+let currentRemainingSeconds = 0;
+let countdownTimerInterval = null;
+
+// Initialize on DOM ready
+document.addEventListener("DOMContentLoaded", function() {
+    loadStudentDashboard();
+    
+    // Live digital clock ticker
+    setInterval(updateLiveClock, 1000);
+});
+
+function updateLiveClock() {
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0];
+    const clockElem = document.getElementById("live-server-clock");
+    if (clockElem) clockElem.innerText = timeStr;
+}
+
+async function loadStudentDashboard() {
+    const token = localStorage.getItem("device_token");
+    if (!token) {
+        window.location.replace("{{ url_for('register') }}");
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/student/me?device_token=${encodeURIComponent(token)}`);
+        if (res.status === 404 || res.status === 401) {
+            // Token reset or removed by admin
+            localStorage.removeItem("device_token");
+            alert("Your device token was reset or not found in the campus database. Please pair your device again.");
+            window.location.replace("{{ url_for('register') }}");
+            return;
+        }
+
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.message || "Could not load student profile.");
+            return;
+        }
+
+        studentData = data;
+        renderDashboard(data);
+
+    } catch (err) {
+        console.error("Dashboard load failed:", err);
+        const alertBox = document.getElementById("checkin-alert-box");
+        if (alertBox) {
+            alertBox.className = "mt-4 p-4 rounded-2xl text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 block";
+            alertBox.innerText = "Network connection failed. Please ensure your device is connected to the campus network.";
+        }
+    } finally {
+        document.getElementById("portal-loading").classList.add("hidden");
+        document.getElementById("portal-content").classList.remove("hidden");
+    }
+}
+
+function renderDashboard(data) {
+    const student = data.student;
+    const network = data.network;
+    const timeWindow = data.time_window;
+    const history = data.history;
+    const todayLog = data.today_attendance;
+
+    // 1. Populate Profile Details
+    document.getElementById("student-name-display").innerText = student.full_name;
+    document.getElementById("student-roll-display").innerText = student.roll_number;
+    document.getElementById("student-email-display").innerText = student.email;
+    document.getElementById("link-full-profile").href = `/student/${encodeURIComponent(student.roll_number)}`;
+
+    // Device Token Badge
+    const token = localStorage.getItem("device_token");
+    if (token) {
+        document.getElementById("badge-device-token").innerHTML = `
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Token: <span class="font-mono">${token.substring(0, 6)}...${token.substring(token.length - 4)}</span>
+        `;
+    }
+
+    // 2. Network Status Pill & Info
+    const netBadge = document.getElementById("badge-network-status");
+    const netCard = document.getElementById("network-info-card");
+    const netIcon = document.getElementById("network-icon-box");
+    const netDesc = document.getElementById("network-desc-text");
+
+    if (network.is_campus_wifi) {
+        netBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+        netBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Wi-Fi Verified (${network.client_ip})`;
+        
+        netCard.className = "p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs flex items-start gap-3";
+        netIcon.className = "w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5";
+        netDesc.innerHTML = `<strong class="text-emerald-900">Connected to Campus Wi-Fi</strong><div class="text-emerald-700 font-mono mt-0.5">IP: ${network.client_ip}</div>`;
+    } else {
+        netBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30";
+        netBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span> Outside Campus Wi-Fi (${network.client_ip})`;
+        
+        netCard.className = "p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs flex items-start gap-3";
+        netIcon.className = "w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0 mt-0.5";
+        netDesc.innerHTML = `<strong class="text-rose-900">Unauthorized IP Subnet</strong><div class="text-rose-700 font-mono mt-0.5">IP: ${network.client_ip} (Connect to Campus Wi-Fi)</div>`;
+    }
+
+    // 3. Time Window Status & Countdown Setup
+    setupTimeWindowAndCountdown(timeWindow);
+
+    // 4. Check-In Button / Verified Card State
+    renderCheckInState(todayLog, timeWindow, network);
+
+    // 5. Render History & Stats
+    renderHistoryAndStats(history);
+}
+
+function setupTimeWindowAndCountdown(tw) {
+    const statusPill = document.getElementById("window-status-pill");
+    const heading = document.getElementById("countdown-heading");
+    const subtext = document.getElementById("countdown-subtext");
+
+    currentRemainingSeconds = tw.seconds_remaining || 0;
+
+    if (tw.status === "ON_TIME") {
+        statusPill.className = "px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800";
+        statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Window Open (Present)`;
+        heading.innerText = "On-Time Cutoff";
+        subtext.innerText = `Check in before ${tw.cutoff_time} to be marked Present.`;
+    } else if (tw.status === "LATE") {
+        statusPill.className = "px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-amber-100 text-amber-800";
+        statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Late Window Active`;
+        heading.innerText = "Late Grace Window";
+        subtext.innerText = `Past on-time cutoff. Check-ins before ${tw.late_cutoff_time} recorded as Late.`;
+    } else if (tw.status === "NOT_STARTED") {
+        statusPill.className = "px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-sky-100 text-sky-800";
+        statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-sky-500"></span> Window Not Started`;
+        heading.innerText = "Opens At " + tw.start_time;
+        subtext.innerText = "Attendance check-ins begin when the daily window opens.";
+    } else {
+        statusPill.className = "px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-rose-100 text-rose-800";
+        statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Window Closed`;
+        heading.innerText = "Check-In Closed";
+        subtext.innerText = `Today's attendance window closed at ${tw.cutoff_time}.`;
+    }
+
+    // Start Countdown Ticker
+    if (countdownTimerInterval) clearInterval(countdownTimerInterval);
+    updateCountdownDisplay(currentRemainingSeconds);
+
+    countdownTimerInterval = setInterval(function() {
+        if (currentRemainingSeconds > 0) {
+            currentRemainingSeconds--;
+            updateCountdownDisplay(currentRemainingSeconds);
+        } else {
+            clearInterval(countdownTimerInterval);
+            // Re-evaluate window state on deadline hit
+            loadStudentDashboard();
+        }
+    }, 1000);
+}
+
+function updateCountdownDisplay(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+
+    document.getElementById("countdown-hours").innerText = String(h).padStart(2, '0');
+    document.getElementById("countdown-minutes").innerText = String(m).padStart(2, '0');
+    document.getElementById("countdown-seconds").innerText = String(s).padStart(2, '0');
+}
+
+function renderCheckInState(todayLog, tw, network) {
+    const alreadyView = document.getElementById("already-checked-in-view");
+    const btnView = document.getElementById("checkin-btn-view");
+    const markBtn = document.getElementById("btn-mark-attendance");
+    const btnText = document.getElementById("btn-mark-text");
+    const btnSub = document.getElementById("btn-subtext");
+
+    if (todayLog) {
+        alreadyView.classList.remove("hidden");
+        btnView.classList.add("hidden");
+
+        const statusElem = document.getElementById("today-record-status");
+        statusElem.innerText = todayLog.status;
+        statusElem.className = todayLog.status === "Present" 
+            ? "px-2 py-0.5 rounded-full text-xs bg-emerald-200 text-emerald-950 font-bold" 
+            : "px-2 py-0.5 rounded-full text-xs bg-amber-200 text-amber-950 font-bold";
+
+        document.getElementById("today-record-time").innerText = todayLog.timestamp;
+        document.getElementById("today-record-ip").innerText = todayLog.client_ip || network.client_ip;
+    } else {
+        alreadyView.classList.add("hidden");
+        btnView.classList.remove("hidden");
+
+        if (!network.is_campus_wifi) {
+            markBtn.disabled = true;
+            markBtn.className = "w-full py-4 px-6 rounded-2xl bg-slate-300 text-slate-500 font-bold text-base cursor-not-allowed";
+            btnText.innerText = "Connect to Campus Wi-Fi to Check In";
+            btnSub.innerText = `Your IP (${network.client_ip}) is not on authorized campus Wi-Fi.`;
+        } else if (!tw.is_open) {
+            markBtn.disabled = true;
+            markBtn.className = "w-full py-4 px-6 rounded-2xl bg-slate-300 text-slate-500 font-bold text-base cursor-not-allowed";
+            btnText.innerText = tw.status === "NOT_STARTED" ? `Opens at ${tw.start_time}` : "Attendance Window Closed Today";
+            btnSub.innerText = tw.message;
+        } else if (tw.status === "LATE") {
+            markBtn.disabled = false;
+            markBtn.className = "w-full py-4 px-6 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-base shadow-lg shadow-amber-600/30 transition-all hover:scale-[1.01] flex items-center justify-center gap-3";
+            btnText.innerText = "Mark Attendance (Late)";
+            btnSub.innerText = `Past deadline (${tw.cutoff_time}). You will be logged as LATE.`;
+        } else {
+            markBtn.disabled = false;
+            markBtn.className = "w-full py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.01] flex items-center justify-center gap-3";
+            btnText.innerText = "Mark Attendance (Present)";
+            btnSub.innerText = `Check in before ${tw.cutoff_time} to record on-time attendance.`;
+        }
+    }
+}
+
+function renderHistoryAndStats(hist) {
+    document.getElementById("stat-present-days").innerText = hist.present_days;
+    document.getElementById("stat-late-days").innerText = hist.late_days;
+    document.getElementById("stat-attendance-rate").innerText = hist.attendance_percentage + "%";
+    document.getElementById("stat-rate-bar").style.width = Math.min(100, hist.attendance_percentage) + "%";
+
+    const eligBadge = document.getElementById("stat-eligibility-badge");
+    if (hist.is_eligible) {
+        eligBadge.className = "mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800";
+        eligBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Exam Eligible (>=75%)`;
+    } else {
+        eligBadge.className = "mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800";
+        eligBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Attendance Low (<75%)`;
+    }
+
+    // Table
+    const tbody = document.getElementById("history-table-body");
+    document.getElementById("history-count-badge").innerText = `${hist.logs.length} entries`;
+
+    if (!hist.logs || hist.logs.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="py-12 text-center text-xs text-slate-400">
+                    No attendance records found yet. Mark attendance when campus Wi-Fi is active.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = hist.logs.map(l => `
+        <tr class="hover:bg-slate-50 transition-colors">
+            <td class="py-3.5 px-6 font-semibold text-slate-900 whitespace-nowrap">${l.date}</td>
+            <td class="py-3.5 px-6 font-mono text-xs text-slate-600 whitespace-nowrap">${l.timestamp}</td>
+            <td class="py-3.5 px-6 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    l.status === 'Present' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                }">
+                    <span class="w-1.5 h-1.5 rounded-full ${l.status === 'Present' ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+                    ${l.status}
+                </span>
+            </td>
+            <td class="py-3.5 px-6 font-mono text-xs text-slate-600 whitespace-nowrap">${l.client_ip || '127.0.0.1'}</td>
+            <td class="py-3.5 px-6 text-xs text-slate-500 whitespace-nowrap">${l.detection_method || 'Device Token Wi-Fi'}</td>
+        </tr>
+    `).join("");
+}
+
+// Check-in Execution
+async function performAttendanceCheckIn() {
+    const token = localStorage.getItem("device_token");
+    if (!token) {
+        window.location.replace("{{ url_for('register') }}");
+        return;
+    }
+
+    const btn = document.getElementById("btn-mark-attendance");
+    const originalText = document.getElementById("btn-mark-text").innerText;
+    btn.disabled = true;
+    document.getElementById("btn-mark-text").innerHTML = `
+        <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Verifying & Logging Presence...
+    `;
+
+    const alertBox = document.getElementById("checkin-alert-box");
+    alertBox.className = "hidden";
+
+    try {
+        const response = await fetch("/api/attendance/check-in", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ device_token: token })
+        });
+
+        const resData = await response.json();
+
+        if (response.ok && resData.success) {
+            alertBox.className = "mt-4 p-4 rounded-2xl text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200 block";
+            alertBox.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>${resData.message}</span>
+                </div>
+            `;
+            // Refresh dashboard
+            await loadStudentDashboard();
+        } else {
+            alertBox.className = "mt-4 p-4 rounded-2xl text-xs font-medium bg-rose-50 text-rose-900 border border-rose-200 block";
+            alertBox.innerHTML = `
+                <div class="flex items-start gap-2">
+                    <svg class="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div>
+                        <p class="font-bold">Check-In Denied</p>
+                        <p class="mt-0.5">${resData.message || "Failed to record attendance."}</p>
+                    </div>
+                </div>
+            `;
+            btn.disabled = false;
+            document.getElementById("btn-mark-text").innerText = originalText;
+        }
+
+    } catch (err) {
+        alertBox.className = "mt-4 p-4 rounded-2xl text-xs font-medium bg-rose-50 text-rose-900 border border-rose-200 block";
+        alertBox.innerText = "Network error communicating with campus attendance server.";
+        btn.disabled = false;
+        document.getElementById("btn-mark-text").innerText = originalText;
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Wi-Fi Attendance System{% endblock %} | Google Workspace for Education</title>
+    <!-- Google Fonts: Roboto & Google Sans style -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        google: {
+                            blue: '#1a73e8',
+                            'blue-hover': '#1557b0',
+                            'blue-light': '#e8f0fe',
+                            'blue-text': '#174ea6',
+                            red: '#ea4335',
+                            'red-light': '#fce8e6',
+                            'red-text': '#c5221f',
+                            yellow: '#fbbc04',
+                            'yellow-light': '#fef7e0',
+                            'yellow-text': '#b06000',
+                            green: '#34a853',
+                            'green-light': '#e6f4ea',
+                            'green-text': '#137333',
+                            gray: '#5f6368',
+                            dark: '#202124',
+                            border: '#dadce0',
+                            bg: '#f8f9fa',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Google Sans"', 'Roboto', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    <style>
+        body {
+            font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+            background-color: #f8f9fa;
+            color: #202124;
+        }
+        .google-card {
+            background-color: #ffffff;
+            border: 1px solid #dadce0;
+            border-radius: 16px;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .google-card:hover {
+            box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+        }
+        .google-btn-primary {
+            background-color: #1a73e8;
+            color: #ffffff;
+            border-radius: 9999px;
+            font-weight: 500;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .google-btn-primary:hover {
+            background-color: #1557b0;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+        }
+        .google-btn-outlined {
+            border: 1px solid #dadce0;
+            color: #1a73e8;
+            border-radius: 9999px;
+            font-weight: 500;
+            background-color: #ffffff;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .google-btn-outlined:hover {
+            background-color: #f8f9fa;
+            border-color: #d2e3fc;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col selection:bg-blue-100 selection:text-blue-900">
+
+    <!-- Top Navigation Bar: Google Workspace Style -->
+    <header class="bg-white border-b border-google-border sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                
+                <!-- Brand Logo: Google Style Product Identity -->
+                <div class="flex items-center gap-3">
+                    {% if current_admin %}
+                    <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-2.5 group">
+                        <!-- Google 4-Color Styled Wi-Fi Icon -->
+                        <div class="w-10 h-10 rounded-xl bg-white border border-google-border flex items-center justify-center shadow-xs group-hover:border-google-blue transition-colors">
+                            <svg class="w-6 h-6 text-google-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                            </svg>
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-lg font-bold tracking-tight text-google-dark" style="font-family: 'Google Sans', sans-serif;">AttendIQ</span>
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-google-blue-light text-google-blue-text border border-blue-200/80">Admin Console</span>
+                            </div>
+                            <span class="text-[10px] text-google-gray font-normal">Google Workspace for Education</span>
+                        </div>
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('index') }}" class="flex items-center gap-2.5 group">
+                        <div class="w-10 h-10 rounded-xl bg-white border border-google-border flex items-center justify-center shadow-xs group-hover:border-google-blue transition-colors">
+                            <svg class="w-6 h-6 text-google-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                            </svg>
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-lg font-bold tracking-tight text-google-dark" style="font-family: 'Google Sans', sans-serif;">AttendIQ</span>
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-google-green-light text-google-green-text border border-green-200/80">Campus Wi-Fi</span>
+                            </div>
+                            <span class="text-[10px] text-google-gray font-normal">Touchless Attendance Portal</span>
+                        </div>
+                    </a>
+                    {% endif %}
+                </div>
+
+                <!-- Navigation Tabs: Material Pill Styling -->
+                <nav class="hidden md:flex items-center gap-1">
+                    {% if current_admin %}
+                    <!-- ADMIN ONLY NAVIGATION (Clean & Separated) -->
+                    <a href="{{ url_for('admin_dashboard') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'admin_dashboard' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Dashboard
+                    </a>
+                    <a href="{{ url_for('admin_students') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'admin_students' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Students
+                    </a>
+                    <a href="{{ url_for('admin_logs') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'admin_logs' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Audit Logs
+                    </a>
+                    <a href="{{ url_for('admin_timetable') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'admin_timetable' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Timetable
+                    </a>
+                    <a href="{{ url_for('admin_alerts') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'admin_alerts' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Email Alerts
+                    </a>
+                    <a href="{{ url_for('admin_scanner') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'admin_scanner' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Engine
+                    </a>
+                    {% else %}
+                    <!-- STUDENT / GUEST NAVIGATION -->
+                    <a href="{{ url_for('index') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'index' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Daily Check-In
+                    </a>
+                    <a href="{{ url_for('register') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint == 'register' %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Register Device
+                    </a>
+                    <a href="{{ url_for('student_lookup') }}" 
+                       class="px-4 py-2 text-sm font-medium rounded-full transition-colors {% if request.endpoint in ['student_lookup', 'student_profile'] %}bg-google-blue-light text-google-blue-text font-semibold{% else %}text-google-gray hover:bg-slate-100 hover:text-google-dark{% endif %}">
+                        Attendance Records
+                    </a>
+                    {% endif %}
+                </nav>
+
+                <!-- Right Side Controls & Status -->
+                <div class="flex items-center gap-3">
+                    {% if current_admin %}
+                    <!-- Active period indicator -->
+                    {% if active_period %}
+                    <div class="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-google-blue-light border border-blue-200 text-xs font-medium text-google-blue-text">
+                        <span class="w-2 h-2 rounded-full bg-google-blue animate-pulse"></span>
+                        <span>{{ active_period.course_code }} &bull; {{ active_period.room_number }}</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Scanner State -->
+                    <div class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-google-border text-xs text-google-gray">
+                        <span class="w-2 h-2 rounded-full {% if scanner_is_running %}bg-google-green{% else %}bg-google-yellow{% endif %}"></span>
+                        <span>Scanner: {% if scanner_is_running %}<strong class="text-google-green-text">Active</strong>{% else %}<strong class="text-google-yellow-text">Paused</strong>{% endif %}</span>
+                    </div>
+
+                    <!-- Google Account Profile Avatar & Controls -->
+                    <div class="flex items-center gap-2 pl-2 border-l border-google-border">
+                        <a href="{{ url_for('index', view='student') }}" class="hidden sm:inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full text-google-gray hover:bg-slate-100" title="Preview Student Portal">
+                            <svg class="w-3.5 h-3.5 text-google-gray" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            Student View
+                        </a>
+                        <!-- Google-style Circle Avatar with Initial 'A' -->
+                        <div class="w-8 h-8 rounded-full bg-google-blue text-white flex items-center justify-center font-bold text-xs shadow-xs" title="Signed in as {{ current_admin }}">
+                            {{ current_admin[:1]|upper }}
+                        </div>
+                        <span class="hidden sm:inline-block text-xs font-medium text-google-dark">{{ current_admin }}</span>
+                        <a href="{{ url_for('logout') }}" 
+                           class="px-3 py-1 text-xs font-medium text-google-red-text hover:bg-google-red-light rounded-full border border-red-200 transition-colors">
+                            Sign out
+                        </a>
+                    </div>
+                    {% else %}
+                    <!-- Wi-Fi Network Chip -->
+                    <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-google-border text-xs text-google-gray">
+                        <span class="w-2 h-2 rounded-full {% if is_campus_wifi %}bg-google-green{% else %}bg-google-yellow{% endif %}"></span>
+                        <span>{{ client_ip }}</span>
+                    </div>
+
+                    <!-- Google Style Admin Sign In -->
+                    <a href="{{ url_for('login') }}" 
+                       class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-google-blue hover:bg-google-blue-light border border-google-border rounded-full transition-colors">
+                        <svg class="w-4 h-4 text-google-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Admin Sign In
+                    </a>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- Flash Messages Container: Google Material Alerts -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="space-y-2 mb-4">
+                    {% for category, message in messages %}
+                        {% set alert_classes = {
+                            'error': 'bg-google-red-light border-red-200 text-google-red-text',
+                            'success': 'bg-google-green-light border-green-200 text-google-green-text',
+                            'warning': 'bg-google-yellow-light border-yellow-200 text-google-yellow-text',
+                            'info': 'bg-google-blue-light border-blue-200 text-google-blue-text'
+                        } %}
+                        <div class="flex items-center justify-between p-3.5 rounded-xl border text-sm font-medium shadow-xs {{ alert_classes.get(category, 'bg-white border-google-border text-google-dark') }}">
+                            <div class="flex items-center gap-3">
+                                {% if category == 'success' %}
+                                <svg class="w-5 h-5 text-google-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                {% elif category == 'error' %}
+                                <svg class="w-5 h-5 text-google-red flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                {% else %}
+                                <svg class="w-5 h-5 text-google-blue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                {% endif %}
+                                <span>{{ message }}</span>
+                            </div>
+                            <button onclick="this.parentElement.remove()" class="text-google-gray hover:text-google-dark text-lg leading-none">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Content Body -->
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Global Footer: Google Workspace Style -->
+    <footer class="bg-white border-t border-google-border mt-auto py-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-google-gray">
+            <div class="flex items-center gap-2">
+                <span class="font-medium text-google-dark">AttendIQ</span>
+                <span>&bull;</span>
+                <span>Google Workspace for Education Architecture</span>
+                <span>&bull;</span>
+                <span>Campus Wi-Fi Subnet &amp; Device Token Verification</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="font-mono">Server Date: {{ today_date }}</span>
+                {% if current_admin %}
+                <a href="{{ url_for('admin_dashboard') }}" class="text-google-blue hover:underline font-medium">Admin Dashboard</a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="text-google-blue hover:underline font-medium">Administrator Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

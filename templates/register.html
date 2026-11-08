@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Register Device - Student Portal{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-6">
+
+    <!-- Page Title Header -->
+    <div class="mb-8 text-center">
+        <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-3.5 py-1 rounded-full">
+            <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+            One-Time Device Enrollment
+        </span>
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 mt-3 tracking-tight">
+            Register Device for Touchless Attendance
+        </h1>
+        <p class="text-sm text-slate-600 mt-2 max-w-xl mx-auto leading-relaxed">
+            Zero passwords, zero OTPs, zero biometric scanning. When you submit this form, your browser generates a permanent cryptographic device token that pairs your phone or laptop with your student ID.
+        </p>
+    </div>
+
+    <!-- Main Registration Card -->
+    <div class="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-xl relative overflow-hidden">
+        
+        <!-- Subtle Top Accent Line -->
+        <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-indigo-600"></div>
+
+        <!-- Already Registered Notice Banner (hidden by default, shown via JS if token already in localStorage) -->
+        <div id="already-registered-alert" class="hidden mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3">
+            <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <div class="text-xs leading-relaxed">
+                <p class="font-bold text-amber-900">Device Token Already Active in this Browser</p>
+                <p class="mt-0.5 text-amber-800">
+                    Your browser already holds an active enrollment token (<code id="existing-token-snippet" class="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-bold"></code>).
+                    Submitting will re-register or update your details. Or navigate straight to your <a href="{{ url_for('index') }}" class="underline font-bold text-indigo-700 hover:text-indigo-900">Daily Check-In Dashboard</a>.
+                </p>
+            </div>
+        </div>
+
+        <form id="registration-form" action="{{ url_for('register') }}" method="POST" class="space-y-6">
+            
+            <!-- Hidden UUID v4 Device Token Field -->
+            <input type="hidden" id="device_token" name="device_token" value="{{ device_token or '' }}">
+
+            <!-- Full Name -->
+            <div>
+                <label for="name" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Full Name <span class="text-rose-500">*</span>
+                </label>
+                <div class="relative">
+                    <input type="text" id="name" name="name" required value="{{ name or full_name or '' }}"
+                           placeholder="e.g. Alex Morgan"
+                           class="w-full px-4 py-3.5 rounded-2xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all shadow-sm font-medium">
+                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roll Number -->
+            <div>
+                <label for="roll_number" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Student ID / Roll Number <span class="text-rose-500">*</span>
+                </label>
+                <div class="relative">
+                    <input type="text" id="roll_number" name="roll_number" required value="{{ roll_number or '' }}"
+                           placeholder="e.g. CS-2026-104"
+                           class="w-full px-4 py-3.5 rounded-2xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm uppercase transition-all shadow-sm font-mono tracking-wider">
+                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 mt-1.5">Official student identifier issued by campus administration.</p>
+            </div>
+
+            <!-- Email Address -->
+            <div>
+                <label for="email" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Campus Email <span class="text-rose-500">*</span>
+                </label>
+                <div class="relative">
+                    <input type="email" id="email" name="email" required value="{{ email or '' }}"
+                           placeholder="e.g. alex.morgan@campus.edu"
+                           class="w-full px-4 py-3.5 rounded-2xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all shadow-sm">
+                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Architecture Guarantee Card -->
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 text-xs text-slate-600 space-y-2">
+                <div class="flex items-center gap-2 font-bold text-slate-900">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    Passwordless, OTP-Free & Biometric-Free Architecture
+                </div>
+                <p class="leading-relaxed text-slate-600">
+                    Upon clicking register, your browser automatically generates a unique 128-bit UUID (v4) token stored permanently in your browser's <code class="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-indigo-700">localStorage</code>. Each day, simply connect to campus Wi-Fi and tap "Mark Attendance" before the cutoff deadline.
+                </p>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-2">
+                <button type="submit" id="btn-submit-register" class="w-full py-3.5 px-6 rounded-full bg-google-blue hover:bg-google-blue-hover text-white font-medium text-sm shadow-xs transition-all flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    Pair Device &amp; Complete Registration
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+    <!-- Quick Links Footer -->
+    <div class="mt-8 text-center text-xs text-slate-500">
+        Already registered on this device? 
+        <a href="{{ url_for('index') }}" class="font-bold text-indigo-600 hover:text-indigo-700 underline ml-1">
+            Go to Daily Check-In Dashboard &rarr;
+        </a>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Helper to generate a compliant UUID v4 string
+function generateDeviceTokenUUID() {
+    if (window.crypto && window.crypto.randomUUID) {
+        return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const tokenInput = document.getElementById("device_token");
+    let existingToken = localStorage.getItem("device_token");
+
+    // Check if browser already has an active token
+    if (existingToken && existingToken.length > 10) {
+        tokenInput.value = existingToken;
+        const alertBox = document.getElementById("already-registered-alert");
+        const snippet = document.getElementById("existing-token-snippet");
+        if (alertBox && snippet) {
+            snippet.innerText = existingToken.substring(0, 8) + '...' + existingToken.substring(existingToken.length - 4);
+            alertBox.classList.remove("hidden");
+        }
+    } else {
+        // Generate and persist fresh UUID v4 token
+        const newToken = generateDeviceTokenUUID();
+        localStorage.setItem("device_token", newToken);
+        tokenInput.value = newToken;
+    }
+
+    // Intercept form submit to ensure device_token is in localStorage and input
+    const form = document.getElementById("registration-form");
+    form.addEventListener("submit", function(e) {
+        let token = localStorage.getItem("device_token");
+        if (!token) {
+            token = generateDeviceTokenUUID();
+            localStorage.setItem("device_token", token);
+        }
+        tokenInput.value = token;
+    });
+});
+</script>
+{% endblock %}

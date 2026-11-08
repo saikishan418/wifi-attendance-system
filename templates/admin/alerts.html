@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Absentee Email Alerts - Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-8 py-4">
+
+    <!-- Header & Action -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('admin_dashboard') }}" class="text-xs font-semibold text-slate-500 hover:text-indigo-600">
+                    &larr; Admin Dashboard
+                </a>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+                Absentee Email Notification Center
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">Automated absent student detection, customizable HTML alert dispatches & SMTP audit telemetry.</p>
+        </div>
+
+        <form action="{{ url_for('send_absentee_alerts') }}" method="POST" onsubmit="return confirm('Send automated absence notifications to all students not detected on Wi-Fi today?');">
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold shadow-md shadow-rose-200 transition-all hover:scale-[1.01]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                Dispatch Today's Absentee Alerts
+            </button>
+        </form>
+    </div>
+
+    <!-- Alert Metrics KPI Bar -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Unreached Absentees Today</p>
+                <p class="text-3xl font-extrabold text-rose-600 mt-2">{{ today_absentees|length }}</p>
+                <p class="text-xs text-slate-400 mt-1 font-medium">Session Date: {{ today_date }}</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Alert Mode Active</p>
+                <p class="text-lg font-extrabold text-slate-900 mt-2">
+                    {% if smtp_settings.mock_mode %}
+                    <span class="text-indigo-600">Mock Mode (Simulated)</span>
+                    {% else %}
+                    <span class="text-emerald-600">Live SMTP Delivery</span>
+                    {% endif %}
+                </p>
+                <p class="text-xs text-slate-400 mt-1">{% if smtp_settings.mock_mode %}Safe testing without real credentials{% else %}Connected to {{ smtp_settings.host }}{% endif %}</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Active Class Context</p>
+                <p class="text-lg font-extrabold text-slate-900 mt-2">
+                    {% if active_period %}{{ active_period.course_code }}{% else %}General Session{% endif %}
+                </p>
+                <p class="text-xs text-slate-400 mt-1">{% if active_period %}{{ active_period.course_name }}{% else %}Campus-wide attendance{% endif %}</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 2-Column: Today's Absentees List & SMTP Configuration -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        <!-- Column 1: Today's Absentees Awaiting Notification -->
+        <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Absent Students Today</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Enrolled students not detected on Wi-Fi during today's sessions.</p>
+                </div>
+                <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                    {{ today_absentees|length }} Absent
+                </span>
+            </div>
+
+            {% if today_absentees %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                        <tr>
+                            <th class="py-3 px-6">Roll Number</th>
+                            <th class="py-3 px-6">Student Name</th>
+                            <th class="py-3 px-6">Email</th>
+                            <th class="py-3 px-6">Device MAC</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium text-slate-700 text-xs">
+                        {% for st in today_absentees %}
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3.5 px-6 font-mono font-bold text-indigo-700 whitespace-nowrap">
+                                <a href="{{ url_for('student_profile', roll_number=st.roll_number) }}" class="hover:underline">
+                                    {{ st.roll_number }}
+                                </a>
+                            </td>
+                            <td class="py-3.5 px-6 font-semibold text-slate-900 whitespace-nowrap">
+                                {{ st.name }}
+                            </td>
+                            <td class="py-3.5 px-6 text-slate-600 whitespace-nowrap">
+                                {{ st.email }}
+                            </td>
+                            <td class="py-3.5 px-6 font-mono text-slate-500 whitespace-nowrap">
+                                {{ st.mac_address }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="py-16 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <p class="text-sm font-semibold text-slate-800">100% Attendance Verified!</p>
+                <p class="text-xs text-slate-500 mt-1">All enrolled students have checked in via campus Wi-Fi today.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Column 2: SMTP Configuration Card -->
+        <div class="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
+            <h3 class="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Email Server (SMTP) Settings
+            </h3>
+            <p class="text-xs text-slate-500 mb-6">
+                Configure SMTP transmission credentials or use Mock Mode for local offline testing.
+            </p>
+
+            <form action="{{ url_for('admin_alerts') }}" method="POST" class="space-y-4">
+                
+                <!-- Mock Mode Toggle -->
+                <div class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200 flex items-center justify-between">
+                    <div>
+                        <span class="block text-xs font-bold text-indigo-900">Mock Mode (Simulated Dispatch)</span>
+                        <span class="block text-[11px] text-indigo-700">Simulates delivery and generates audit logs without sending real external emails.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-3">
+                        <input type="checkbox" name="smtp_mock_mode" value="1" {% if smtp_settings.mock_mode %}checked{% endif %} class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">SMTP Host</label>
+                        <input type="text" name="smtp_host" value="{{ smtp_settings.host }}" placeholder="smtp.gmail.com" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Port</label>
+                        <input type="number" name="smtp_port" value="{{ smtp_settings.port }}" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">From Sender Address</label>
+                    <input type="email" name="smtp_from" value="{{ smtp_settings.from }}" placeholder="attendance@campus.edu" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">SMTP Username</label>
+                    <input type="text" name="smtp_user" value="{{ smtp_settings.user }}" placeholder="campus_system@domain.edu" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">SMTP Password / App Key</label>
+                    <input type="password" name="smtp_password" placeholder="••••••••••••" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-sm transition-all">
+                        Save SMTP Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Outgoing Email Alerts Audit History -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Email Dispatches Audit Log</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Chronological record of sent absence warning emails.</p>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                {{ recent_alerts|length }} Logged Notifications
+            </span>
+        </div>
+
+        {% if recent_alerts %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                    <tr>
+                        <th class="py-3 px-6">Timestamp</th>
+                        <th class="py-3 px-6">Student</th>
+                        <th class="py-3 px-6">Recipient Email</th>
+                        <th class="py-3 px-6">Subject</th>
+                        <th class="py-3 px-6">Delivery Status</th>
+                        <th class="py-3 px-6">Details</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium text-slate-700 text-xs">
+                    {% for a in recent_alerts %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-3.5 px-6 font-mono text-slate-500 whitespace-nowrap">
+                            {{ a.sent_at }}
+                        </td>
+                        <td class="py-3.5 px-6 text-slate-900 font-bold whitespace-nowrap">
+                            {{ a.student_name }} <span class="text-indigo-600 font-mono text-[11px]">({{ a.roll_number }})</span>
+                        </td>
+                        <td class="py-3.5 px-6 text-slate-600 whitespace-nowrap">
+                            {{ a.recipient_email }}
+                        </td>
+                        <td class="py-3.5 px-6 text-slate-800 font-medium">
+                            {{ a.subject }}
+                        </td>
+                        <td class="py-3.5 px-6 whitespace-nowrap">
+                            {% if a.status == 'Sent' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ● Sent (SMTP)
+                            </span>
+                            {% elif a.status == 'Mock Sent' %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                ● Mock Delivered
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                ● Failed
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3.5 px-6 text-slate-400 text-[11px]">
+                            {{ a.details }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="py-12 text-center text-xs text-slate-400 italic">
+            No email notifications dispatched yet. Click "Dispatch Today's Absentee Alerts" to notify absentees.
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

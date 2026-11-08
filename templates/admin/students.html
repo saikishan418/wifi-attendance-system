@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Students - Admin Directory{% endblock %}
+
+{% block content %}
+<div class="space-y-6 py-4">
+
+    <!-- Header & Action -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('admin_dashboard') }}" class="text-xs font-semibold text-slate-500 hover:text-indigo-600">
+                    &larr; Admin Dashboard
+                </a>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+                Student Device Directory
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">Manage enrolled students, browser device tokens, and attendance records.</p>
+        </div>
+
+        <div>
+            <button onclick="document.getElementById('modal-add-student').classList.remove('hidden')" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-google-blue hover:bg-google-blue-hover text-white text-xs sm:text-sm font-medium shadow-xs transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Student Manually
+            </button>
+        </div>
+    </div>
+
+    <!-- Device Token Architecture Notice Banner -->
+    <div class="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-800 flex items-start gap-3">
+        <svg class="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+        <div>
+            <strong class="font-bold text-indigo-900">Passwordless Device Token System Active:</strong>
+            Students check in by visiting the campus portal from their registered browser. Each device holds a permanent UUID v4 token in
+            <code class="bg-indigo-100 px-1 py-0.5 rounded font-mono text-indigo-900">localStorage</code>.
+            If a student changes devices, use <strong>Reset Token</strong> so they can re-pair the new browser. No passwords, OTPs, or MAC addresses needed.
+        </div>
+    </div>
+
+    <!-- Directory Search & List -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h3 class="text-base font-bold text-slate-900">
+                Enrolled Students <span class="text-xs font-medium text-slate-500 ml-1">({{ students|length }} total)</span>
+            </h3>
+
+            <!-- Search Form -->
+            <form action="{{ url_for('admin_students') }}" method="GET" class="relative w-full sm:w-72">
+                <input type="text" name="q" value="{{ search_query }}"
+                       placeholder="Search name, roll, email, or token..."
+                       class="w-full px-3.5 py-2 pl-9 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+            </form>
+        </div>
+
+        {% if students %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200/80 text-xs uppercase font-semibold text-slate-500 tracking-wider">
+                    <tr>
+                        <th class="py-3.5 px-6">Roll Number</th>
+                        <th class="py-3.5 px-6">Student Name</th>
+                        <th class="py-3.5 px-6">Email Address</th>
+                        <th class="py-3.5 px-6">Device Token</th>
+                        <th class="py-3.5 px-6">Present / Late</th>
+                        <th class="py-3.5 px-6 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                    {% for st in students %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-4 px-6 font-mono text-xs font-bold text-indigo-700 whitespace-nowrap">
+                            <a href="{{ url_for('student_profile', roll_number=st.roll_number) }}" class="hover:underline">
+                                {{ st.roll_number }}
+                            </a>
+                        </td>
+                        <td class="py-4 px-6 text-slate-900 font-semibold text-xs whitespace-nowrap">
+                            {{ st.full_name or st.name }}
+                        </td>
+                        <td class="py-4 px-6 text-xs text-slate-600">
+                            {{ st.email }}
+                        </td>
+                        <td class="py-4 px-6 text-[11px] text-slate-500 whitespace-nowrap">
+                            {% if st.device_token %}
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" title="Token Active"></span>
+                                <code class="font-mono bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-indigo-700">
+                                    {{ st.device_token[:8] }}...{{ st.device_token[-4:] }}
+                                </code>
+                            </div>
+                            {% else %}
+                            <div class="flex items-center gap-2 text-amber-600">
+                                <span class="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
+                                <span class="font-semibold italic">Token Cleared — Awaiting Re-Registration</span>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="py-4 px-6 text-xs whitespace-nowrap">
+                            <span class="font-bold text-emerald-600">{{ st.total_present }}</span>
+                            <span class="text-slate-400 mx-1">/</span>
+                            <span class="font-bold text-amber-500">{{ st.total_late }}</span>
+                            <span class="text-slate-400 ml-1 font-normal">days</span>
+                        </td>
+                        <td class="py-4 px-6 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center gap-1.5">
+                                <a href="{{ url_for('student_profile', roll_number=st.roll_number) }}" class="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-slate-100" title="View Profile">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </a>
+                                <button type="button" 
+                                        data-id="{{ st.id }}"
+                                        data-name="{{ st.full_name or st.name }}"
+                                        data-roll="{{ st.roll_number }}"
+                                        data-email="{{ st.email }}"
+                                        data-mac="{{ st.mac_address or '' }}"
+                                        onclick="openEditModal(this)"
+                                        class="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-slate-100" 
+                                        title="Edit Student">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </button>
+                                <!-- Reset Device Token Button -->
+                                <form action="{{ url_for('reset_student_token', student_id=st.id) }}" method="POST"
+                                      onsubmit="return confirm('Reset device token for {{ st.roll_number }}? They will need to re-register at /register with their new browser/device.');"
+                                      class="inline" title="Reset Device Token (for device change)">
+                                    <button type="submit" class="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-slate-100">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11V7m0 4v4"/></svg>
+                                    </button>
+                                </form>
+                                <form action="{{ url_for('delete_student', student_id=st.id) }}" method="POST" 
+                                      onsubmit="return confirm('Delete student {{ st.roll_number }}? All attendance records will be permanently removed.');" 
+                                      class="inline">
+                                    <button type="submit" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-slate-100" title="Delete Student">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="py-16 text-center">
+            <p class="text-sm font-semibold text-slate-700">No students registered yet</p>
+            <p class="text-xs text-slate-500 mt-1">Use the "Add Student Manually" button above or students can self-register at <a href="{{ url_for('register') }}" class="text-indigo-600 underline">/register</a>.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Modal: Add Student Manually -->
+<div id="modal-add-student" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Add New Student</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Device token will be auto-generated and paired on first login.</p>
+            </div>
+            <button onclick="document.getElementById('modal-add-student').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+        </div>
+
+        <form action="{{ url_for('admin_students') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="add">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name</label>
+                <input type="text" name="name" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Roll Number</label>
+                <input type="text" name="roll_number" required placeholder="e.g. CS-2026-105" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Email</label>
+                <input type="email" name="email" required placeholder="student@campus.edu" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wi-Fi MAC Address <span class="text-slate-400 font-normal normal-case">(optional)</span></label>
+                <input type="text" name="mac_address" placeholder="AA:BB:CC:DD:EE:FF (optional)" class="mac-input w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <p class="text-[11px] text-slate-400 mt-1">Only needed for legacy ARP scanner support. Device tokens are the primary verification method.</p>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-3">
+                <button type="button" onclick="document.getElementById('modal-add-student').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm">Add Student</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Student -->
+<div id="modal-edit-student" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-5">
+            <h3 class="text-base font-bold text-slate-900">Edit Student Details</h3>
+            <button onclick="document.getElementById('modal-edit-student').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+        </div>
+
+        <form id="edit-student-form" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name</label>
+                <input type="text" id="edit-name" name="name" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Roll Number</label>
+                <input type="text" id="edit-roll" name="roll_number" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Email</label>
+                <input type="email" id="edit-email" name="email" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Wi-Fi MAC Address <span class="text-slate-400 font-normal normal-case">(optional)</span></label>
+                <input type="text" id="edit-mac" name="mac_address" class="mac-input w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono uppercase focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <!-- Inline Token Reset Option -->
+            <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200/80">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="reset_token" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer">
+                    <div>
+                        <p class="text-xs font-bold text-amber-900">Also Reset Device Token</p>
+                        <p class="text-[11px] text-amber-700 mt-0.5">Check this if the student is switching to a new browser or device. They will need to visit /register to pair the new device.</p>
+                    </div>
+                </label>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-3">
+                <button type="button" onclick="document.getElementById('modal-edit-student').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-xl bg-sky-600 hover:bg-sky-700 text-white shadow-sm">Update Student</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditModal(btn) {
+    const id = btn.dataset.id;
+    document.getElementById("edit-student-form").action = `/admin/students/${id}/edit`;
+    document.getElementById("edit-name").value = btn.dataset.name || '';
+    document.getElementById("edit-roll").value = btn.dataset.roll || '';
+    document.getElementById("edit-email").value = btn.dataset.email || '';
+    document.getElementById("edit-mac").value = btn.dataset.mac || '';
+    document.getElementById("modal-edit-student").classList.remove("hidden");
+}
+</script>
+{% endblock %}
